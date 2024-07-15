@@ -1,0 +1,79 @@
+from flask import Flask, request, jsonify
+from flask_sqlalchemy import SQLAlchemy
+
+app = Flask(__name__)
+app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///events.db'
+app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
+db = SQLAlchemy(app)
+
+# Model for Events
+class Event(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    title = db.Column(db.String(200), nullable=False)
+    date = db.Column(db.String(10), nullable=False)  # Format: YYYY-MM-DD
+    location = db.Column(db.String(200), nullable=False)
+    description = db.Column(db.Text, nullable=True)
+
+# Initialize the database
+with app.app_context():
+    db.create_all()
+
+@app.route('/')
+def home():
+    return "Welcome to the Event Organizer API!"
+
+@app.route('/events', methods=['POST'])
+def add_event():
+    data = request.get_json()
+    new_event = Event(
+        title=data['title'],
+        date=data['date'],
+        location=data['location'],
+        description=data.get('description')
+    )
+    db.session.add(new_event)
+    db.session.commit()
+    return jsonify({'message': 'Event added successfully'}), 201
+
+@app.route('/events', methods=['GET'])
+def get_events():
+    events = Event.query.all()
+    return jsonify([{
+        'id': e.id,
+        'title': e.title,
+        'date': e.date,
+        'location': e.location,
+        'description': e.description
+    } for e in events]), 200
+
+@app.route('/events/<int:id>', methods=['GET'])
+def get_event(id):
+    event = Event.query.get_or_404(id)
+    return jsonify({
+        'id': event.id,
+        'title': event.title,
+        'date': event.date,
+        'location': event.location,
+        'description': event.description
+    }), 200
+
+@app.route('/events/<int:id>', methods=['PUT'])
+def update_event(id):
+    data = request.get_json()
+    event = Event.query.get_or_404(id)
+    event.title = data['title']
+    event.date = data['date']
+    event.location = data['location']
+    event.description = data.get('description', event.description)
+    db.session.commit()
+    return jsonify({'message': 'Event updated successfully'}), 200
+
+@app.route('/events/<int:id>', methods=['DELETE'])
+def delete_event(id):
+    event = Event.query.get_or_404(id)
+    db.session.delete(event)
+    db.session.commit()
+    return jsonify({'message': 'Event deleted successfully'}), 200
+
+if __name__ == "__main__":
+    app.run(debug=True)
